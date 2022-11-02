@@ -10,7 +10,9 @@ import { UniformType } from './types';
 
 interface GUIProperties {
   albedo: number[];
+  info: string;
   ponctual: boolean;
+  iron: boolean;
 }
 
 /**
@@ -70,6 +72,7 @@ class Application {
       '_alpha' : 1.0,
       '_metallic' : 0.0,
       '_ponctual' : false,
+      '_iron' : false,
       '_create_texture' : true,
     };
 
@@ -90,7 +93,9 @@ class Application {
 
     this._guiProperties = {
       albedo: [255, 255, 255],
-      ponctual: false
+      info: "↓ select only one ↓",
+      ponctual: false,
+      iron: false,
     };
 
     this._createGUI();
@@ -235,6 +240,8 @@ class Application {
     const props = this._guiProperties;
 
     this._uniforms['_ponctual'] = props.ponctual;
+    this._uniforms['_iron'] = props.iron;
+
 
     // Set the color from the GUI into the uniform list.
     vec3.set(
@@ -250,7 +257,6 @@ class Application {
 
     if (this._uniforms['_create_texture'] == true)
     {
-      console.debug("bite");
       this._context._gl.bindFramebuffer(this._context._gl.FRAMEBUFFER, this.fb);
    
       // Tell WebGL how to convert from clip space to pixels
@@ -307,7 +313,10 @@ class Application {
   private _createGUI(): GUI {
     const gui = new GUI();
     gui.addColor(this._guiProperties, 'albedo');
+    gui.add(this._guiProperties, 'info');
     gui.add(this._guiProperties, 'ponctual');
+    gui.add(this._guiProperties, 'iron');
+
     return gui;
   }
 }

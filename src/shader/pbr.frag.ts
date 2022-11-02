@@ -19,6 +19,8 @@ uniform sampler2D _texture_diffuse;
 uniform sampler2D _texture_specular;
 uniform sampler2D _texture_brdf;
 uniform bool _ponctual;
+uniform bool _iron;
+
 uniform bool _create_texture;
 
 uniform sampler2D _texture_iron_color;
@@ -172,32 +174,36 @@ void image_brdf()
 
 void iron_pbr()
 {
-  vec3 albedo = sRGBToLinear(vec4(uMaterial.albedo, 1.0)).rgb;
   vec3 w_o = normalize(cam_pos - FragPos);
   vec3 normal = normalize(vNormalWS);
 
   vec2 uv = cartesianToPolar(normal);
 
-  float metallic = (texture(_texture_iron_metallic, uv).x * texture(_texture_iron_metallic, uv).y * texture(_texture_iron_metallic, uv).z) ;
+  vec4 metallic_texture = texture(_texture_iron_metallic, uv);
 
-  vec3 f0 = mix(vec3(0.04), albedo, metallic);
+  float metallic = (metallic_texture.x * metallic_texture.y * metallic_texture.z)  / 3.0;
 
-  float roughness = (texture(_texture_iron_roughness, uv).x * texture(_texture_iron_roughness, uv).y * texture(_texture_iron_roughness, uv).z);
+  vec4 texture_color = sRGBToLinear(texture(_texture_iron_color, uv));
+  vec3 f0 = mix(vec3(0.04), texture_color.rgb, metallic);
 
-  vec4 texture_color = texture(_texture_iron_color, uv);
+  vec4 rougness_texture = texture(_texture_iron_roughness, uv);
 
-  // Environment are convoluted around the normal, that’s our w_i
-  vec3 kS = FresnelShlick(f0, normal, h(normal, w_o));
-  vec3 kD = (1.0 - kS) * (1.0 - metallic) * albedo;
-  vec3 diffuseBRDFEval = kD * texture_color.rgb;
-  // Specular is fetched using reflected direction
-  vec3 prefilteredSpec = texture_color.rgb;
-  vec2 brdf = texture(_texture_brdf, vec2(clamp(dot(normal, w_o), 0.001, 1.0), roughness)).rg;
-  vec3 specularBRDFEval = prefilteredSpec * (kS * brdf.x + brdf.y);
-  vec3 gi = diffuseBRDFEval + specularBRDFEval;
+  float roughness = (rougness_texture.x * rougness_texture.y * rougness_texture.z) / 3.0;
 
-  gi = gi / (gi + 1.0); 
-  outFragColor.rgba =LinearTosRGB(vec4(gi, 1.0));
+
+  vec3 irradiance = vec3(0.0);
+
+  for(int i = 0; i < NB_LIGHTS; ++i)
+  {
+    vec3 w_i = normalize(lights[i] - FragPos);
+    vec3 kS = FresnelShlick(f0, w_i, h(w_i, w_o));
+    vec3 specularBRDFEval = kS * f_s(w_i, w_o, normal, roughness);
+    vec3 diffuseBRDFEval = (1.0 - kS) * texture_color.rgb;
+    diffuseBRDFEval *= (1.0 - metallic);
+    irradiance += (diffuseBRDFEval + specularBRDFEval) * dot(normal, w_i);
+  }
+  irradiance = irradiance / (irradiance + 1.0); 
+  outFragColor.rgba =LinearTosRGB(vec4(irradiance, 1.0));
 }
 
 void create_texture_diffuse()
@@ -238,17 +244,20 @@ main()
   if (_create_texture)
   {
     create_texture_diffuse();
-    return;
+    //return;
   }
 
   if (_ponctual)
   {
     ponctual_light();
   }
+  else if (_iron)
+  {
+    iron_pbr();
+  }
   else
   {
     image_brdf();
-    //iron_pbr();
   }
 }
 `;
